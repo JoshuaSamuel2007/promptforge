@@ -1,0 +1,3 @@
+{
+  "rewrites": [{ "source": "/api/forge", "destination": "/api/forge.js" }]
+}

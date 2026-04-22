@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromptForge</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    :root {
+      --primary-purple: #8b5cf6;
+      --primary-purple-glow: rgba(139, 92, 246, 0.8);
+      --glass-bg: rgba(255, 255, 255, 0.04);
+      --glass-border: rgba(139, 92, 246, 0.25);
+      --text-main: #ffffff;
+      --text-muted: #888888;
+      --bg-dark: rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #000000 0%, #0a0015 50%, #0d001f 100%);
+      min-height: 100vh;
+      color: var(--text-main);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    #bg-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none; /* Let events pass through to body/document */
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 80px 24px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* Stats Widget */
+    .stats-widget {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stats-widget div {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stats-widget span {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--text-main);
+      text-shadow: 0 0 20px var(--primary-purple-glow);
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .tagline {
+      color: var(--text-muted);
+      font-size: 1rem;
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    /* Glass Card */
+    .glass-card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Form Elements */
+    textarea {
+      width: 100%;
+      min-height: 140px;
+      background: var(--bg-dark);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 1rem;
+      resize: vertical;
+      transition: all 0.3s ease;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--primary-purple);
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.4);
+    }
+
+    textarea::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #7c3aed, #db2777);
+      border: none;
+      border-radius: 12px;
+      color: white;
+      font-family: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.3);
+    }
+
+    .btn:hover:not(:disabled) {
+      transform: scale(1.02);
+      box-shadow: 0 0 25px rgba(124, 58, 237, 0.6);
+    }
+
+    .btn:disabled {
+      opacity: 0.8;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Loading Animation */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      display: none;
+    }
+
+    .btn.loading .spinner {
+      display: block;
+    }
+
+    .btn.loading .btn-text {
+      display: none;
+    }
+    
+    .btn.loading::after {
+      content: "Forging your prompt...";
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Output Card */
+    .output-card {
+      display: none; /* Hidden initially */
+      animation: slideUpFadeIn 0.5s ease forwards;
+    }
+
+    .output-card.show {
+      display: flex;
+    }
+
+    @keyframes slideUpFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .output-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .output-title {
+      font-weight: 600;
+      color: var(--primary-purple);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    pre {
+      background: var(--bg-dark);
+      border-left: 4px solid var(--primary-purple);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e2e8f0;
+    }
+
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      padding: 6px 12px;
+      color: white;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Error Shake Animation */
+    .shake {
+      animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+      border-color: #ef4444 !important;
+    }
+
+    @keyframes shake {
+      10%, 90% { transform: translate3d(-1px, 0, 0); }
+      20%, 80% { transform: translate3d(2px, 0, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+      40%, 60% { transform: translate3d(4px, 0, 0); }
+    }
+
+    .error-msg {
+      color: #ef4444;
+      font-size: 0.9rem;
+      margin-top: 8px;
+      display: none;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 20px 0;
+      color: #444444;
+      font-size: 0.8rem;
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="bg-canvas"></canvas>
+
+  <div class="stats-widget">
+    <div>👁 Visitors: <span id="visitor-count">0</span></div>
+    <div>⚡ Forged: <span id="forged-count">0</span></div>
+  </div>
+
+  <main class="container">
+    <header>
+      <h1>PromptForge</h1>
+      <p class="tagline">"Turn weak prompts into weapons."</p>
+    </header>
+
+    <div class="glass-card">
+      <div>
+        <textarea id="prompt-input" placeholder="Drop your rough prompt here... PromptForge will do the rest."></textarea>
+        <div id="input-error" class="error-msg">Your prompt can't be empty — give me something to work with.</div>
+      </div>
+      
+      <button id="forge-btn" class="btn">
+        <span class="spinner"></span>
+        <span class="btn-text">⚡ Forge It</span>
+      </button>
+    </div>
+
+    <div id="output-card" class="glass-card output-card">
+      <div class="output-header">
+        <div class="output-title">✨ Amplified Prompt</div>
+        <button id="copy-btn" class="copy-btn">📋 Copy to Clipboard</button>
+      </div>
+      <pre id="output-content"></pre>
+    </div>
+  </main>
+
+  <footer>
+    PromptForge · Powered by Groq & LLaMA 3.3 · Free forever
+  </footer>
+
+  <script>
+    // --- CANVAS BACKGROUND LOGIC ---
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let particles = [];
+    const numParticles = 120;
+    
+    // Mouse/Touch Interaction
+    let pointer = { x: null, y: null, active: false };
+
+    function resize() {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Track pointer
+    document.addEventListener('mousemove', (e) => {
+      pointer.x = e.clientX;
+      pointer.y = e.clientY;
+      pointer.active = true;
+    });
+
+    document.addEventListener('mouseleave', () => {
+      pointer.active = false;
+    });
+
+    document.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) {
+        pointer.x = e.touches[0].clientX;
+        pointer.y = e.touches[0].clientY;
+        pointer.active = true;
+      }
+    });
+
+    document.addEventListener('touchend', () => {
+      pointer.active = false;
+    });
+
+    class Particle {
+      constructor() {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        this.vx = (Math.random() - 0.5) * 0.5;
+        this.vy = (Math.random() - 0.5) * 0.5;
+        this.radius = 1.5;
+        this.baseVx = this.vx;
+        this.baseVy = this.vy;
+      }
+
+      update() {
+        // Natural drift
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Bounce off edges
+        if (this.x < 0 || this.x > width) this.vx *= -1;
+        if (this.y < 0 || this.y > height) this.vy *= -1;
+
+        // Pointer repulsion
+        if (pointer.active && pointer.x !== null && pointer.y !== null) {
+          const dx = pointer.x - this.x;
+          const dy = pointer.y - this.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          if (dist < 120) {
+            const force = (120 - dist) / 120;
+            const angle = Math.atan2(dy, dx);
+            // Push away
+            this.vx -= Math.cos(angle) * force * 0.5;
+            this.vy -= Math.sin(angle) * force * 0.5;
+          }
+        }
+
+        // Return to natural drift gradually
+        this.vx += (this.baseVx - this.vx) * 0.05;
+        this.vy += (this.baseVy - this.vy) * 0.05;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(139,92,246,0.6)';
+        ctx.fill();
+      }
+    }
+
+    // Init particles
+    for (let i = 0; i < numParticles; i++) {
+      particles.push(new Particle());
+    }
+
+    function animateCanvas() {
+      // Clear transparent
+      ctx.clearRect(0, 0, width, height);
+
+      // Update and draw particles
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+
+      // Draw connections
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const distSq = dx * dx + dy * dy;
+
+          if (distSq < 10000) { // 100 * 100
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = 'rgba(139,92,246,0.15)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+        }
+      }
+
+      requestAnimationFrame(animateCanvas);
+    }
+
+    animateCanvas();
+
+
+    // --- APP LOGIC ---
+
+    // Stats Widget Logic
+    const visitorEl = document.getElementById('visitor-count');
+    const forgedEl = document.getElementById('forged-count');
+
+    // Initialize stats
+    let visitors = parseInt(localStorage.getItem('pf_visitors') || '0');
+    let forged = parseInt(localStorage.getItem('pf_forged') || '0');
+
+    // Increment visitors on load
+    visitors++;
+    localStorage.setItem('pf_visitors', visitors.toString());
+
+    // Count-up animation
+    function animateValue(obj, start, end, duration) {
+      let startTimestamp = null;
+      const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        obj.innerHTML = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+          window.requestAnimationFrame(step);
+        }
+      };
+      window.requestAnimationFrame(step);
+    }
+
+    // Run animation
+    animateValue(visitorEl, 0, visitors, 1000);
+    animateValue(forgedEl, 0, forged, 1000);
+
+
+    // API Logic
+    const forgeBtn = document.getElementById('forge-btn');
+    const promptInput = document.getElementById('prompt-input');
+    const inputError = document.getElementById('input-error');
+    const outputCard = document.getElementById('output-card');
+    const outputContent = document.getElementById('output-content');
+    const copyBtn = document.getElementById('copy-btn');
+
+    forgeBtn.addEventListener('click', async () => {
+      const promptText = promptInput.value.trim();
+
+      // Reset states
+      promptInput.classList.remove('shake');
+      inputError.style.display = 'none';
+      outputCard.classList.remove('show');
+      
+      // Validation
+      if (!promptText) {
+        // Trigger reflow to restart animation if needed
+        void promptInput.offsetWidth;
+        promptInput.classList.add('shake');
+        inputError.innerText = "Your prompt can't be empty — give me something to work with.";
+        inputError.style.display = 'block';
+        return;
+      }
+
+      // Loading state
+      forgeBtn.classList.add('loading');
+      forgeBtn.disabled = true;
+
+      try {
+        const response = await fetch('/api/forge', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: promptText })
+        });
+
+        const data = await response.json();
+
+        if (response.status === 200) {
+          // Success
+          outputContent.innerText = data.result || 'No result returned.';
+          outputCard.classList.add('show');
+          
+          // Increment forged counter
+          forged++;
+          localStorage.setItem('pf_forged', forged.toString());
+          forgedEl.innerHTML = forged; // Update instantly, no need to re-animate
+
+          // Clear textarea on success? Spec says "Empty textarea on submit: shake textarea with CSS keyframe animation, show the 400 message without making any API call." 
+          // Wait, spec meant clear it if it's empty BEFORE submit? "Empty textarea on submit: shake textarea..." => meaning if the textarea is empty when they hit submit.
+          // The prompt says "Empty textarea on submit: shake textarea..." which means handling the empty case. Not clearing it on success.
+          
+        } else if (response.status === 429) {
+          outputContent.innerText = "⚠️ Daily limit reached. Come back tomorrow!";
+          outputCard.classList.add('show');
+        } else if (response.status === 400) {
+          promptInput.classList.add('shake');
+          inputError.innerText = data.error || "Your prompt can't be empty — give me something to work with.";
+          inputError.style.display = 'block';
+        } else {
+          // 500 or others
+          outputContent.innerText = "⚠️ Something went wrong. Try again.";
+          outputCard.classList.add('show');
+        }
+
+      } catch (err) {
+        outputContent.innerText = "⚠️ Something went wrong. Try again.";
+        outputCard.classList.add('show');
+      } finally {
+        forgeBtn.classList.remove('loading');
+        forgeBtn.disabled = false;
+      }
+    });
+
+    // Copy to clipboard
+    copyBtn.addEventListener('click', async () => {
+      const textToCopy = outputContent.innerText;
+      if (!textToCopy) return;
+
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        const originalText = copyBtn.innerText;
+        copyBtn.innerText = "✅ Copied!";
+        copyBtn.style.background = "rgba(16, 185, 129, 0.2)"; // Green tint
+        copyBtn.style.borderColor = "rgba(16, 185, 129, 0.4)";
+        
+        setTimeout(() => {
+          copyBtn.innerText = "📋 Copy to Clipboard";
+          copyBtn.style.background = "";
+          copyBtn.style.borderColor = "";
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy', err);
+      }
+    });
+
+  </script>
+</body>
+</html>
