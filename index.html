@@ -333,7 +333,15 @@
   </main>
 
   <footer>
-    PromptForge · Powered by Groq & LLaMA 3.3 · Free forever
+    <div>PromptForge · Powered by Groq & LLaMA 3.3 · Free forever</div>
+    <div style="margin-top: 12px; font-size: 0.85rem; color: #a1a1aa;">
+      <p style="margin-bottom: 6px;">Want to collaborate or create something together?</p>
+      <p>
+        <a href="mailto:joshua.js0528@gmail.com" style="color: var(--primary-purple); text-decoration: none; font-weight: 600;">joshua.js0528@gmail.com</a>
+        <span style="margin: 0 8px; opacity: 0.5;">|</span>
+        <a href="http://www.linkedin.com/in/joshua-samuel-472681380" target="_blank" style="color: var(--primary-purple); text-decoration: none; font-weight: 600;">LinkedIn</a>
+      </p>
+    </div>
   </footer>
 
   <script>
@@ -508,6 +516,14 @@
     const outputCard = document.getElementById('output-card');
     const outputContent = document.getElementById('output-content');
     const copyBtn = document.getElementById('copy-btn');
+
+    // Handle Enter key (Shift+Enter for new line)
+    promptInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        forgeBtn.click();
+      }
+    });
 
     forgeBtn.addEventListener('click', async () => {
       const promptText = promptInput.value.trim();
