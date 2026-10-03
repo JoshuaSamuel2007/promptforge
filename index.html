@@ -201,6 +201,16 @@
       to { transform: rotate(360deg); }
     }
 
+    /* Prompt Length Selector */
+    .length-control { display: flex; flex-direction: column; gap: 10px; }
+    .length-label { font-size: 0.9rem; font-weight: 600; color: var(--text-muted); }
+    .length-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .length-option { padding: 10px 8px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: var(--text-muted); font-family: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+    .length-option:hover { border-color: var(--primary-purple); color: var(--text-main); }
+    .length-option.active { background: rgba(139,92,246,0.15); border-color: var(--primary-purple); color: var(--text-main); box-shadow: 0 0 10px rgba(139,92,246,0.15); }
+    .word-count { color: var(--text-muted); font-size: 0.8rem; margin-top: 8px; }
+    @media (max-width: 560px) { .length-options { grid-template-columns: repeat(2, 1fr); } }
+
     /* Output Card */
     .output-card {
       display: none; /* Hidden initially */
@@ -316,6 +326,16 @@
         <textarea id="prompt-input" placeholder="Drop your rough prompt here... PromptForge will do the rest."></textarea>
         <div id="input-error" class="error-msg">Your prompt can't be empty — give me something to work with.</div>
       </div>
+
+      <div class="length-control">
+        <div class="length-label">Prompt length</div>
+        <div class="length-options" role="group" aria-label="Prompt length">
+          <button type="button" class="length-option" data-length="concise">⚡ Concise</button>
+          <button type="button" class="length-option active" data-length="balanced">⚖️ Balanced</button>
+          <button type="button" class="length-option" data-length="detailed">🔍 Detailed</button>
+          <button type="button" class="length-option" data-length="maximum">🧠 Maximum</button>
+        </div>
+      </div>
       
       <button id="forge-btn" class="btn">
         <span class="spinner"></span>
@@ -329,6 +349,7 @@
         <button id="copy-btn" class="copy-btn">📋 Copy to Clipboard</button>
       </div>
       <pre id="output-content"></pre>
+      <div id="word-count" class="word-count">0 words</div>
     </div>
   </main>
 
@@ -516,6 +537,23 @@
     const outputCard = document.getElementById('output-card');
     const outputContent = document.getElementById('output-content');
     const copyBtn = document.getElementById('copy-btn');
+    const wordCountEl = document.getElementById('word-count');
+    const lengthOptions = document.querySelectorAll('.length-option');
+    let selectedLength = 'balanced';
+
+    // Prompt length selector
+    lengthOptions.forEach((option) => {
+      option.addEventListener('click', () => {
+        lengthOptions.forEach((item) => item.classList.remove('active'));
+        option.classList.add('active');
+        selectedLength = option.dataset.length;
+      });
+    });
+
+    function updateWordCount(text) {
+      const count = text.trim() ? text.trim().split(/\s+/).length : 0;
+      wordCountEl.innerText = `${count} ${count === 1 ? 'word' : 'words'}`;
+    }
 
     // Handle Enter key (Shift+Enter for new line)
     promptInput.addEventListener('keydown', (e) => {
@@ -551,7 +589,7 @@
         const response = await fetch('/api/forge', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: promptText })
+          body: JSON.stringify({ prompt: promptText, length: selectedLength })
         });
 
         const data = await response.json();
@@ -559,6 +597,7 @@
         if (response.status === 200) {
           // Success
           outputContent.innerText = data.result || 'No result returned.';
+          updateWordCount(outputContent.innerText);
           outputCard.classList.add('show');
           
           // Increment forged counter
@@ -572,6 +611,7 @@
           
         } else if (response.status === 429) {
           outputContent.innerText = "⚠️ Daily limit reached. Come back tomorrow!";
+          updateWordCount(outputContent.innerText);
           outputCard.classList.add('show');
         } else if (response.status === 400) {
           promptInput.classList.add('shake');
@@ -580,11 +620,13 @@
         } else {
           // 500 or others
           outputContent.innerText = "⚠️ Something went wrong. Try again.";
+          updateWordCount(outputContent.innerText);
           outputCard.classList.add('show');
         }
 
       } catch (err) {
         outputContent.innerText = "⚠️ Something went wrong. Try again.";
+        updateWordCount(outputContent.innerText);
         outputCard.classList.add('show');
       } finally {
         forgeBtn.classList.remove('loading');
